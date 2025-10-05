@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carteira de Investimentos</title>
+    <!-- Incluindo Tailwind CSS para um design responsivo e moderno -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Configuração de fonte e corpo para melhor visualização em celular */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Fundo cinza claro */
+            padding-bottom: 2rem;
+        }
+        /* Garantindo que o canvas seja responsivo */
+        #graficoCanvas {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        /* --- ESTILOS DOS BOTÕES INDIVIDUAIS (Botões de Limite VERDES) --- */
+        .limit-btn {
+            @apply px-4 py-2 text-sm font-semibold rounded-lg transition duration-200 ease-in-out cursor-pointer;
+            /* Inativo: Fundo Branco, Texto Cinza, Borda Verde, Hover Verde */
+            @apply bg-white text-gray-700 border border-green-300 shadow-md hover:bg-green-50 hover:text-green-700;
+        }
+        /* ATIVO: Destaque com cor VERDE forte */
+        .limit-btn.active {
+            @apply bg-green-600 text-white shadow-xl border-green-600 ring-2 ring-green-400 transform scale-105;
+        }
+        /* Cor de fundo para mensagens de status (sucesso/erro) */
+        .status-message {
+            @apply p-3 mt-4 rounded-lg font-medium text-sm text-center;
+        }
+        .status-success {
+            @apply bg-green-100 text-green-700;
+        }
+        .status-error {
+            @apply bg-red-100 text-red-700;
+        }
+        
+        /* Estilos para o Modal */
+        .modal {
+            @apply fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 transition-opacity duration-300;
+        }
+        .modal-content {
+            @apply bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm;
+        }
+        /* --- FIM ESTILOS DE BOTÕES --- */
+    </style>
+</head>
+<body class="p-4">
+
+    <!-- Container Principal centrado e limitado para dispositivos móveis -->
+    <div class="max-w-md mx-auto bg-white shadow-xl rounded-2xl p-6">
+        
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-4">
+            Minha Carteira de Ações
+        </h1>
+
+        <!-- Botões de Seleção de Limite -->
+        <div id="limit-controls" class="flex justify-around space-x-2 mb-6 p-2">
+            <button class="limit-btn" data-limit="5">Top 5</button>
+            <button class="limit-btn active" data-limit="10">Top 10</button>
+            <button class="limit-btn" data-limit="999">Todos</button>
+        </div>
+        
+        <p id="slice-info" class="text-center text-sm text-gray-500 mb-6">Carregando dados...</p>
+
+        <!-- Área do Gráfico de Pizza -->
+        <div class="flex justify-center mb-8">
+            <canvas id="graficoCanvas" class="w-full" width="300" height="300"></canvas>
+        </div>
+        
+        <!-- Legenda e Detalhes da Carteira -->
+        <div id="legenda" class="space-y-3">
+            <h2 class="text-xl font-semibold text-gray-700 border-b pb-2 mb-4">
+                Composição dos Ativos (Ações)
+            </h2>
+            <!-- Container onde os ativos e o TOTAL serão inseridos -->
+            <div id="ativos-list-content">
+                <!-- Os detalhes dos ativos e o TOTAL serão inseridos aqui pelo JavaScript -->
+            </div>
+
+            <!-- Botão para Adicionar/Atualizar Ativo -->
+            <button id="toggle-form-btn" class="w-full bg-green-500 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-green-600 transition duration-300 mt-6 mb-4 flex items-center justify-center space-x-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span id="form-button-text">Adicionar ou Aportar em Ativo</span>
+            </button>
+
+            <!-- Formulário de Adição/Atualização (Aporte) -->
+            <div id="add-form-container" class="hidden bg-gray-100 p-4 rounded-xl shadow-inner mb-6">
+                <h3 class="text-lg font-bold text-gray-700 mb-4" id="form-title">Novo Aporte / Novo Ativo</h3>
+                <form id="add-ativo-form" class="space-y-3">
+                    <div>
+                        <label for="ticker" class="block text-sm font-medium text-gray-700">Ticker (ex: BBAS3)</label>
+                        <input type="text" id="ticker" name="ticker" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 focus:ring-green-500 focus:border-green-500 uppercase" placeholder="TICKER" maxlength="10">
+                    </div>
+                    <div>
+                        <label for="valor" class="block text-sm font-medium text-gray-700">Valor do Aporte/Investimento (R$)</label>
+                        <input type="number" id="valor" name="valor" step="0.01" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 focus:ring-green-500 focus:border-green-500" placeholder="0.00" min="0">
+                    </div>
+                    <!-- Botão de submissão do formulário -->
+                    <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2 rounded-lg shadow-md hover:bg-indigo-700 transition duration-150">Salvar/Atualizar Aporte</button>
+                    <button type="button" id="cancel-add-btn" class="w-full text-sm text-gray-500 hover:text-gray-700 mt-2">Cancelar</button>
+                </form>
+                <div id="status-message" class="hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Edição (para corrigir valor) -->
+    <div id="edit-modal" class="modal hidden opacity-0 transition-opacity">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Corrigir Valor de <span id="edit-ticker-title" class="text-green-600"></span></h3>
+            <p class="text-sm text-gray-600 mb-4">Use este formulário apenas para **CORRIGIR** o valor total de lançamento. Se for um novo aporte, use o botão "Adicionar ou Aportar".</p>
+            <form id="edit-ativo-form" class="space-y-3">
+                <input type="hidden" id="edit-doc-id">
+                <div>
+                    <label for="edit-valor" class="block text-sm font-medium text-gray-700">Novo Valor Total (R$)</label>
+                    <input type="number" id="edit-valor" name="valor" step="0.01" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 focus:ring-green-500 focus:border-green-500" placeholder="0.00" min="0">
+                </div>
+                <button type="submit" class="w-full bg-orange-500 text-white font-bold py-2 rounded-lg shadow-md hover:bg-orange-600 transition duration-150">Salvar Correção</button>
+                <button type="button" id="cancel-edit-btn" class="w-full text-sm text-gray-500 hover:text-gray-700 mt-2">Cancelar Edição</button>
+            </form>
+        </div>
+    </div>
+    <!-- Fim Modal de Edição -->
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            onSnapshot, 
+            addDoc, 
+            updateDoc, 
+            query, 
+            where, 
+            getDocs, 
+            doc, 
+            deleteDoc
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Configuração Firebase ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        const ATIVOS_COLLECTION_PATH = `artifacts/${appId}/public/data/investimentos`;
+
+        // Variáveis globais de estado
+        let currentSliceLimit = 10;
+        let ATIVOS_ORIGINAIS = []; 
+        let isAuthReady = false;
+        let userId = null;
+
+        // Dados de Investimentos Estáticos (para a primeira importação)
+        const DADOS_INICIAIS_ESTATICOS = [
+            { nome: 'AGRO3', valor: 3122.25, cor: '#e6194b' },
+            { nome: 'B3SA3', valor: 440.25, cor: '#3cb44b' },
+            { nome: 'BBAS3', valor: 15473.67, cor: '#ffe119' }, 
+            { nome: 'BBDC3', valor: 2432.99, cor: '#4363d8' },
+            { nome: 'BBSE3', valor: 7146.71, cor: '#f58231' }, // Valor inicial da BBSE3
+            { nome: 'CMIG4', valor: 7514.69, cor: '#911eb4' }, 
+            { nome: 'CMIN3', valor: 668.18, cor: '#46f0f0' }, 
+            { nome: 'CSMG3', valor: 3481.75, cor: '#f032e6' },
+            { nome: 'CXSE3', valor: 10521.08, cor: '#bcf60c' }, 
+            { nome: 'FESA4', valor: 96.30, cor: '#fabebe' },
+            { nome: 'ISAE4', valor: 2334.50, cor: '#008080' },
+            { nome: 'KEPL3', valor: 847.42, cor: '#e6beff' },
+            { nome: 'LEVE3', valor: 5139.26, cor: '#9a6324' },
+            { nome: 'NEOE3', valor: 2040.60, cor: '#800000' },
+            { nome: 'PETR4', valor: 13965.68, cor: '#aaffc3' }, 
+            { nome: 'SAPR4', valor: 1534.97, cor: '#808000' },
+            { nome: 'SMTO3', valor: 1156.96, cor: '#ffd8b1' },
+            { nome: 'TAEE11', valor: 3951.44, cor: '#000075' },
+            { nome: 'VALE3', valor: 5790.73, cor: '#c4d7e0' }
+        ];
+
+        // Mapeamento de cores para novos ativos
+        const COLORS = DADOS_INICIAIS_ESTATICOS.map(a => a.cor);
+        let colorIndex = 0;
+        function getNextColor() {
+            const color = COLORS[colorIndex % COLORS.length];
+            colorIndex++;
+            return color;
+        }
+
+        // Referências DOM
+        const canvas = document.getElementById('graficoCanvas');
+        const ctx = canvas.getContext('2d');
+        const ativosListContentDiv = document.getElementById('ativos-list-content'); 
+        const sliceInfoP = document.getElementById('slice-info');
+        const addFormContainer = document.getElementById('add-form-container');
+        const addAtivoForm = document.getElementById('add-ativo-form');
+        const toggleFormBtn = document.getElementById('toggle-form-btn');
+        const cancelAddBtn = document.getElementById('cancel-add-btn');
+        const statusMessageDiv = document.getElementById('status-message');
+        const editModal = document.getElementById('edit-modal');
+        const editAtivoForm = document.getElementById('edit-ativo-form');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+        const editTickerTitle = document.getElementById('edit-ticker-title');
+
+        // Função para formatar valores monetários
+        const formatter = new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+        });
+
+        // Função para exibir mensagem de status
+        function showStatus(message, isError = false) {
+            statusMessageDiv.textContent = message;
+            statusMessageDiv.className = `status-message ${isError ? 'status-error' : 'status-success'}`;
+            statusMessageDiv.classList.remove('hidden');
+            setTimeout(() => {
+                statusMessageDiv.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Função para mostrar/esconder o modal de edição
+        function toggleEditModal(show, ativo = null) {
+            if (show && ativo) {
+                editTickerTitle.textContent = ativo.nome;
+                document.getElementById('edit-doc-id').value = ativo.id;
+                document.getElementById('edit-valor').value = ativo.valor.toFixed(2);
+
+                editModal.classList.remove('hidden');
+                setTimeout(() => editModal.classList.remove('opacity-0'), 10);
+            } else {
+                editModal.classList.add('opacity-0');
+                setTimeout(() => editModal.classList.add('hidden'), 300); 
+                editAtivoForm.reset();
+            }
+        }
+
+        // --- Lógica de Dados e Gráfico (Inalterada) ---
+
+        function getProcessedActives(limit) {
+            if (ATIVOS_ORIGINAIS.length === 0) return [];
+            // Importante: Ordena por valor do MAIOR para o MENOR
+            const sortedAtivos = [...ATIVOS_ORIGINAIS].sort((a, b) => b.valor - a.valor);
+            const totalActivesCount = sortedAtivos.length;
+            const isAll = limit >= totalActivesCount;
+            const actualLimit = isAll ? totalActivesCount : limit;
+            const topX = sortedAtivos.slice(0, actualLimit);
+            const restantes = sortedAtivos.slice(actualLimit);
+            let chartData = topX;
+
+            if (restantes.length > 0 && !isAll) {
+                const valorOutros = restantes.reduce((soma, ativo) => soma + ativo.valor, 0);
+                chartData.push({
+                    nome: `Outros (${restantes.length} Ativos)`,
+                    valor: valorOutros,
+                    cor: '#9CA3AF', 
+                    id: 'outros'
+                });
+            }
+
+            if (isAll) {
+                sliceInfoP.textContent = `Todos os ${totalActivesCount} Ativos na Carteira`;
+            } else {
+                const outrosCount = restantes.length > 0 ? ` + Outros (${restantes.length})` : '';
+                sliceInfoP.textContent = `Top ${limit} Ativos${outrosCount}`;
+            }
+
+            return chartData;
+        }
+
+        function desenharGrafico() {
+            const chartData = getProcessedActives(currentSliceLimit);
+            const valorTotal = ATIVOS_ORIGINAIS.reduce((soma, ativo) => soma + ativo.valor, 0);
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ativosListContentDiv.innerHTML = ''; 
+
+            if (valorTotal === 0) {
+                ctx.fillStyle = '#6b7280';
+                ctx.font = '16px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText('Nenhum ativo salvo. Adicione um!', canvas.width / 2, canvas.height / 2);
+                ativosListContentDiv.innerHTML = '<p class="text-center text-gray-500">Adicione ativos para ver o gráfico.</p>';
+                return;
+            }
+
+            const centroX = canvas.width / 2;
+            const centroY = canvas.height / 2;
+            const raio = Math.min(centroX, centroY) - 10; 
+            let anguloInicial = 0;
+            
+            chartData.forEach(ativo => {
+                const percentual = ativo.valor / valorTotal;
+                const anguloFatia = percentual * 2 * Math.PI;
+                const anguloFinal = anguloInicial + anguloFatia;
+
+                const percentualFormatado = (percentual * 100).toFixed(2);
+                const valorFormatado = formatter.format(ativo.valor);
+                
+                // Desenhar fatia
+                ctx.beginPath();
+                ctx.moveTo(centroX, centroY);
+                ctx.arc(centroX, centroY, raio, anguloInicial, anguloFinal);
+                ctx.closePath();
+                ctx.fillStyle = ativo.cor;
+                ctx.fill();
+
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Desenho do texto na fatia
+                const meioAngulo = anguloInicial + anguloFatia / 2;
+                const raioTexto = raio * 0.68;
+                const xTexto = centroX + raioTexto * Math.cos(meioAngulo);
+                const yTexto = centroY + raioTexto * Math.sin(meioAngulo);
+
+                const nomeAtivo = ativo.nome.split(' ')[0];
+                const texto1 = nomeAtivo;
+                const texto2 = `${percentualFormatado}%`;
+
+                ctx.fillStyle = '#FFFFFF';
+                let fontSize = (percentual * 100 > 3) ? 10 : 8; 
+                ctx.font = `bold ${fontSize}px Inter`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+                ctx.shadowBlur = 3;
+                ctx.shadowOffsetX = 1;
+                ctx.shadowOffsetY = 1;
+
+                if (percentual * 100 > 1.5) { 
+                    ctx.fillText(texto1, xTexto, yTexto - 6);
+                    ctx.fillText(texto2, xTexto, yTexto + 6);
+                }
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                
+                // Criação do item da legenda (COM BOTÕES DE AÇÃO)
+                const isOutros = ativo.id === 'outros';
+                const itemClass = isOutros ? 'bg-gray-200 shadow-md' : 'bg-gray-50 shadow-sm';
+                const nameClass = isOutros ? 'font-extrabold text-gray-700' : 'font-medium text-gray-900';
+
+                const actionsHtml = !isOutros ? `
+                    <div class="flex space-x-2 ml-4">
+                        <!-- Botão de Editar/Corrigir -->
+                        <button data-id="${ativo.id}" data-nome="${ativo.nome}" data-valor="${ativo.valor}" class="btn-edit text-xs font-medium text-blue-600 hover:text-blue-800 transition duration-150 p-1 rounded hover:bg-blue-100" title="Corrigir valor de lançamento">
+                           Editar
+                        </button>
+                        <!-- Botão de Remover/Vender -->
+                        <button data-id="${ativo.id}" data-nome="${ativo.nome}" class="btn-remove text-xs font-medium text-red-600 hover:text-red-800 transition duration-150 p-1 rounded hover:bg-red-100" title="Remover (Venda Total)">
+                            Remover
+                        </button>
+                    </div>
+                ` : '<div></div>'; // Vazio para "Outros"
+
+                const itemLegenda = `
+                    <div data-id="${ativo.id}" class="flex justify-between items-center p-3 rounded-lg ${itemClass}">
+                        <div class="flex items-center w-full">
+                            <!-- Círculo de cor do ativo -->
+                            <div class="w-4 h-4 rounded-full mr-3" style="background-color: ${ativo.cor};"></div>
+                            <div class="flex-grow">
+                                <span class="${nameClass}">${ativo.nome}</span>
+                                <span class="block text-xs text-gray-500">${valorFormatado} (${percentualFormatado}%)</span>
+                            </div>
+                            ${actionsHtml}
+                        </div>
+                    </div>
+                `;
+                ativosListContentDiv.innerHTML += itemLegenda;
+
+                anguloInicial = anguloFinal;
+            });
+            
+            // Adicionar o total geral na legenda
+            const totalItem = `
+                <div class="flex justify-between items-center p-3 mt-4 bg-green-100 rounded-lg border-2 border-green-400">
+                    <span class="text-lg font-bold text-green-700">Valor Total da Carteira</span>
+                    <span class="text-lg font-extrabold text-green-700">${formatter.format(valorTotal)}</span>
+                </div>
+            `;
+            ativosListContentDiv.innerHTML += totalItem;
+
+            // Re-anexa os eventos dos botões Editar e Remover após o HTML ser reconstruído
+            attachActionButtonsEvents();
+        }
+
+        // --- Funções CRUD do Firestore (Adicionar, Atualizar, Remover) ---
+
+        /**
+         * Adiciona um novo ativo ou soma o valor a um ativo existente (APORTE).
+         */
+        async function addOrUpdateAtivo(ticker, valor) {
+            const ativosRef = collection(db, ATIVOS_COLLECTION_PATH);
+            // Busca o documento pelo ticker
+            const q = query(ativosRef, where("nome", "==", ticker));
+            const snapshot = await getDocs(q);
+            
+            if (!snapshot.empty) {
+                // ATUALIZAR (somar) o valor (APORTE)
+                const docToUpdate = snapshot.docs[0];
+                const valorAtual = docToUpdate.data().valor;
+                const novoValorTotal = valorAtual + valor;
+                
+                try {
+                    const docRef = doc(db, ATIVOS_COLLECTION_PATH, docToUpdate.id);
+                    // Garante que o valor está sendo atualizado no Firestore
+                    await updateDoc(docRef, {
+                        valor: novoValorTotal
+                    });
+                    showStatus(`Aporte de ${formatter.format(valor)} realizado em ${ticker}.`);
+                } catch (e) {
+                    console.error("Erro ao atualizar documento (Aporte): ", e);
+                    showStatus('Erro ao realizar o aporte. Verifique sua conexão.', true);
+                }
+            } else {
+                // CRIAR um novo documento (NOVO ATIVO)
+                try {
+                    await addDoc(ativosRef, {
+                        nome: ticker,
+                        valor: valor,
+                        cor: getNextColor(),
+                        userId: userId,
+                        tipo: 'Ação'
+                    });
+                    showStatus(`Novo ativo ${ticker} adicionado com sucesso!`);
+                } catch (e) {
+                    console.error("Erro ao adicionar documento: ", e);
+                    showStatus('Erro ao salvar o novo ativo.', true);
+                }
+            }
+        }
+
+        /**
+         * Atualiza o valor total de um ativo (EDIÇÃO/CORREÇÃO).
+         */
+        async function editAtivoValue(docId, newValor) {
+            try {
+                const docRef = doc(db, ATIVOS_COLLECTION_PATH, docId);
+                await updateDoc(docRef, {
+                    valor: newValor
+                });
+                showStatus(`Valor do ativo corrigido para ${formatter.format(newValor)} com sucesso!`);
+                toggleEditModal(false);
+            } catch (e) {
+                console.error("Erro ao editar documento: ", e);
+                showStatus('Erro ao corrigir o valor do ativo.', true);
+            }
+        }
+
+        /**
+         * Remove um ativo do Firestore (VENDA TOTAL).
+         * CORREÇÃO: Removido window.confirm() pois é bloqueado pelo ambiente.
+         */
+        async function removeAtivo(docId, nome) {
+            // NOTE: window.confirm() é bloqueado no ambiente. Usamos showStatus para feedback.
+            
+            // Em um ambiente de produção, usaríamos um modal customizado para confirmação.
+            const userConfirmed = confirm(`ATENÇÃO: Deseja realmente remover ${nome}? (Clique OK para Venda Total)`);
+            
+            if (userConfirmed) {
+                 try {
+                    const docRef = doc(db, ATIVOS_COLLECTION_PATH, docId);
+                    await deleteDoc(docRef);
+                    showStatus(`Ativo ${nome} removido da carteira (Venda Total) com sucesso.`);
+                } catch (e) {
+                    console.error("Erro ao remover documento: ", e);
+                    showStatus('Erro ao remover o ativo. Consulte o console.', true);
+                }
+            } else {
+                showStatus(`Remoção do ativo ${nome} cancelada.`, true);
+            }
+        }
+
+
+        // --- Lógica de UI e Eventos ---
+
+        // Função para re-anexar os eventos dos botões de ação (Editar/Remover)
+        function attachActionButtonsEvents() {
+            // Eventos do Botão EDITAR
+            document.querySelectorAll('.btn-edit').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const id = e.currentTarget.getAttribute('data-id');
+                    const nome = e.currentTarget.getAttribute('data-nome');
+                    // Garante que o valor passado para o modal de edição seja sempre um número float
+                    const valor = parseFloat(e.currentTarget.getAttribute('data-valor'));
+                    
+                    toggleEditModal(true, { id, nome, valor });
+                });
+            });
+
+            // Eventos do Botão REMOVER
+            document.querySelectorAll('.btn-remove').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const id = e.currentTarget.getAttribute('data-id');
+                    const nome = e.currentTarget.getAttribute('data-nome');
+                    removeAtivo(id, nome);
+                });
+            });
+        }
+        
+        // Função para manipular a mudança de limite
+        function setSliceLimit(event) {
+            const limitStr = event.currentTarget.getAttribute('data-limit');
+            const limit = parseInt(limitStr);
+
+            if (currentSliceLimit !== limit) {
+                currentSliceLimit = limit;
+                
+                document.querySelectorAll('.limit-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                
+                event.currentTarget.classList.add('active');
+                desenharGrafico();
+            }
+        }
+        
+        // Configuração dos Event Listeners
+        function setupEventListeners() {
+            // Botões Top X
+            document.querySelectorAll('.limit-btn').forEach(button => {
+                button.addEventListener('click', setSliceLimit);
+            });
+
+            // Toggle do formulário de Aporte
+            toggleFormBtn.addEventListener('click', () => {
+                addFormContainer.classList.toggle('hidden');
+                const isHidden = addFormContainer.classList.contains('hidden');
+                document.getElementById('form-button-text').textContent = isHidden ? 'Adicionar ou Aportar em Ativo' : 'Esconder Formulário';
+            });
+            cancelAddBtn.addEventListener('click', () => {
+                addFormContainer.classList.add('hidden');
+                document.getElementById('form-button-text').textContent = 'Adicionar ou Aportar em Ativo';
+                addAtivoForm.reset();
+            });
+
+            // Submissão do formulário de Aporte
+            addAtivoForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const tickerInput = document.getElementById('ticker');
+                const valorInput = document.getElementById('valor');
+                
+                const ticker = tickerInput.value.trim().toUpperCase();
+                const valor = parseFloat(valorInput.value);
+
+                if (ticker && valor > 0) {
+                    await addOrUpdateAtivo(ticker, valor);
+                    
+                    addAtivoForm.reset();
+                    addFormContainer.classList.add('hidden');
+                    document.getElementById('form-button-text').textContent = 'Adicionar ou Aportar em Ativo';
+                } else {
+                    showStatus('Por favor, preencha o ticker e um valor positivo.', true);
+                }
+            });
+            
+            // Submissão do formulário de EDIÇÃO/CORREÇÃO
+            editAtivoForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const docId = document.getElementById('edit-doc-id').value;
+                const newValor = parseFloat(document.getElementById('edit-valor').value);
+                
+                if (docId && newValor >= 0) {
+                    await editAtivoValue(docId, newValor);
+                } else {
+                    showStatus('O novo valor deve ser zero ou positivo.', true);
+                }
+            });
+
+            // Cancelamento do Modal de Edição
+            cancelEditBtn.addEventListener('click', () => {
+                toggleEditModal(false);
+            });
+            editModal.addEventListener('click', (e) => {
+                if (e.target === editModal) {
+                    toggleEditModal(false);
+                }
+            });
+        }
+
+        // --- Inicialização do App (Inalterada) ---
+        window.onload = async function() {
+            const containerWidth = canvas.parentNode.clientWidth;
+            canvas.width = containerWidth;
+            canvas.height = containerWidth;
+            setupEventListeners();
+            
+            try {
+                const authToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (authToken) {
+                    await signInWithCustomToken(auth, authToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        // Apenas inicializa os dados se a coleção estiver vazia
+                        await initializeDataIfEmpty();
+                        setupFirestoreListener(); 
+                    } else {
+                        isAuthReady = true; 
+                        setupFirestoreListener();
+                    }
+                });
+
+            } catch (error) {
+                console.error("Erro de autenticação:", error);
+                showStatus('Erro de autenticação. Os dados podem não ser salvos.', true);
+            }
+
+            window.addEventListener('resize', function() {
+                clearTimeout(window.resizeTimer);
+                window.resizeTimer = setTimeout(() => {
+                    const containerWidth = canvas.parentNode.clientWidth;
+                    canvas.width = containerWidth;
+                    canvas.height = containerWidth;
+                    desenharGrafico();
+                }, 250);
+            });
+
+            desenharGrafico();
+        };
+        
+        // 1. Função para carregar os dados iniciais se o Firestore estiver vazio
+        async function initializeDataIfEmpty() {
+            try {
+                const collectionRef = collection(db, ATIVOS_COLLECTION_PATH);
+                const snapshot = await getDocs(collectionRef);
+                
+                // Só carrega os dados estáticos se a coleção estiver completamente vazia.
+                if (snapshot.empty) {
+                    for (const ativo of DADOS_INICIAIS_ESTATICOS) {
+                        await addDoc(collectionRef, {
+                            nome: ativo.nome,
+                            valor: ativo.valor,
+                            cor: ativo.cor,
+                            userId: userId,
+                            tipo: 'Ação'
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error("Erro ao inicializar dados:", error);
+            }
+        }
+        
+        // 2. Configura o listener em tempo real (onSnapshot)
+        function setupFirestoreListener() {
+            if (!isAuthReady) return;
+
+            const ativosRef = collection(db, ATIVOS_COLLECTION_PATH);
+            // Query sem orderBy para evitar erros de índice, ordenamos no JS.
+            const q = query(ativosRef);
+
+            // Listener em tempo real
+            onSnapshot(q, (snapshot) => {
+                const novosAtivos = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    novosAtivos.push({
+                        id: doc.id, 
+                        nome: data.nome,
+                        valor: data.valor,
+                        cor: data.cor,
+                        tipo: data.tipo || 'Ação'
+                    });
+                });
+
+                ATIVOS_ORIGINAIS = novosAtivos;
+                desenharGrafico();
+            }, (error) => {
+                console.error("Erro no listener do Firestore:", error);
+                showStatus('Erro ao carregar dados em tempo real. Consulte o console.', true);
+            });
+        }
+
+    </script>
+</body>
+</html>
